@@ -53,12 +53,12 @@ end
 
 # The next two functions overwrite the standard auto-generated methods for these types
 function JLD.gen_h5convert{T<:MyContainer}(parent::JldFile, ::Type{T})
-    # Create the default "write converter" for the MyContainerSerializer type corresponding to T
-    Tser = MyContainerSerializer{eltype(T)}
-    JLD.gen_h5convert(parent, Tser)
-    # Create the default "read converter" for a MyContainerSerializer,
-    # but give it a different name so we can call it independently
-    JLD._gen_jlconvert_type(JldTypeInfo(parent, Tser, true), Tser, :_jlconvert)
+    if !haskey(JLD.H5CONVERT_DEFINED, T)
+        # Create the default "write converter" for the MyContainerSerializer type corresponding to T
+        Tser = MyContainerSerializer{eltype(T)}
+        JLD.gen_h5convert(parent, Tser)
+        JLD.H5CONVERT_DEFINED[T] = true
+    end
 end
 # Prevent the auto-generation of the typically-named "read converter" for a MyContainerSerializer
 # This will allow our custom jlconvert method below to be called instead
@@ -80,6 +80,12 @@ end
 
 # The "read converter", which unpacks the serialized format into the one we want to return
 function JLD.jlconvert{T<:MyContainerSerializer}(::Type{T}, file::JldFile, ptr::Ptr)
+    if !haskey(JLD.JLCONVERT_DEFINED, T)
+        # Create the default "read converter" for a MyContainerSerializer,
+        # but give it a different name so we can call it independently
+        JLD._gen_jlconvert_type(JldTypeInfo(file, T, true), T, :_jlconvert)
+        JLD.JLCONVERT_DEFINED[T] = true
+    end
     # Read the serialized object
     serdata = JLD._jlconvert(MyContainerSerializer{eltype(T)}, file, ptr)
     # Convert to a MyContainer
